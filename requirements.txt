@@ -1,0 +1,21 @@
+# Milvus NER检索系统依赖包
+
+# 向量数据库
+pymilvus>=2.3.0
+
+# 深度学习框架
+torch>=2.0.0
+transformers>=4.30.0
+
+# LLM2Vec模型
+llm2vec>=0.1.0
+
+# PEFT (Parameter-Efficient Fine-Tuning)
+peft>=0.4.0
+
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+
+# 日志和工具
+tqdm>=4.65.0
