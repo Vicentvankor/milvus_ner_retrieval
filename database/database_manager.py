@@ -33,12 +33,17 @@ class DatabaseManager:
         self.embedding_model = embedding_model
         self.data_processor = DataProcessor(embedding_model)
     
-    def initialize_all_collections(self, languages: List[str] = None):
+    def initialize_all_collections(self, languages: List[str] = None, 
+                                 vector_dim: int = None, index_type: str = None, 
+                                 metric_type: str = None):
         """
         初始化所有语种的集合
         
         Args:
             languages: 要初始化的语种列表，如果为None则初始化所有支持的语种
+            vector_dim: 向量维度
+            index_type: 索引类型
+            metric_type: 相似度计算方式
         """
         try:
             target_languages = languages or SUPPORTED_LANGUAGES
@@ -49,11 +54,15 @@ class DatabaseManager:
                 logger.info(f"初始化 {language} 语种的集合...")
                 
                 # 创建实体集合
-                entity_collection = self.milvus_client.create_entity_collection(language)
+                entity_collection = self.milvus_client.create_entity_collection(
+                    language, vector_dim, index_type, metric_type
+                )
                 logger.info(f"实体集合创建完成: {entity_collection}")
                 
                 # 创建句子集合
-                sentence_collection = self.milvus_client.create_sentence_collection(language)
+                sentence_collection = self.milvus_client.create_sentence_collection(
+                    language, vector_dim, index_type, metric_type
+                )
                 logger.info(f"句子集合创建完成: {sentence_collection}")
             
             logger.info("所有集合初始化完成")

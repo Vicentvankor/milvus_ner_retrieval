@@ -61,22 +61,33 @@ class MilvusClient:
             logger.error(f"连接Milvus失败: {e}")
             raise
     
-    def create_entity_collection(self, language: str) -> str:
+    def create_entity_collection(self, language: str, vector_dim: int = None, 
+                               index_type: str = None, metric_type: str = None) -> str:
         """
         创建实体集合
         
         Args:
-            language: 语种代码
+            language: 语种
+            vector_dim: 向量维度
+            index_type: 索引类型
+            metric_type: 相似度计算方式
             
         Returns:
             str: 集合名称
         """
         collection_name = f"{DATABASE_CONFIG['entity_db_prefix']}{language}"
         
+        # 使用传入的参数或默认配置
+        dim = vector_dim or DATABASE_CONFIG["vector_dim"]
+        idx_type = index_type or DATABASE_CONFIG["index_type"]
+        metric = metric_type or DATABASE_CONFIG["metric_type"]
+        
+        logger.info(f"创建实体集合: {collection_name} (维度: {dim})")
+        
         # 检查集合是否已存在
         if utility.has_collection(collection_name):
-            logger.info(f"实体集合 {collection_name} 已存在")
-            return collection_name
+            logger.info(f"集合 {collection_name} 已存在，删除后重新创建")
+            utility.drop_collection(collection_name)
         
         try:
             # 定义字段
@@ -88,26 +99,36 @@ class MilvusClient:
                     auto_id=True
                 ),
                 FieldSchema(
-                    name="entity_embedding",
-                    dtype=DataType.FLOAT_VECTOR,
-                    dim=DATABASE_CONFIG["vector_dim"]
+                    name="entity_id",
+                    dtype=DataType.VARCHAR,
+                    max_length=100
                 ),
                 FieldSchema(
                     name="entity_text",
                     dtype=DataType.VARCHAR,
-                    max_length=1000
+                    max_length=500
                 ),
                 FieldSchema(
                     name="entity_type",
                     dtype=DataType.VARCHAR,
-                    max_length=100
+                    max_length=50
+                ),
+                FieldSchema(
+                    name="language",
+                    dtype=DataType.VARCHAR,
+                    max_length=10
+                ),
+                FieldSchema(
+                    name="embedding",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=dim
                 )
             ]
             
             # 创建集合schema
             schema = CollectionSchema(
                 fields=fields,
-                description=f"实体向量数据库 - {language}"
+                description=f"实体集合 - {language}"
             )
             
             # 创建集合
@@ -119,39 +140,52 @@ class MilvusClient:
             
             # 创建索引
             index_params = {
-                "metric_type": DATABASE_CONFIG["metric_type"],
-                "index_type": DATABASE_CONFIG["index_type"],
-                "params": {"nlist": DATABASE_CONFIG["nlist"]}
+                "metric_type": metric,
+                "index_type": idx_type,
+                "params": {"nlist": DATABASE_CONFIG.get("nlist", 1024)}
             }
             
             collection.create_index(
-                field_name="entity_embedding",
+                field_name="embedding",
                 index_params=index_params
             )
             
-            logger.info(f"成功创建实体集合: {collection_name}")
+            collection.load()
+            
+            logger.info(f"实体集合创建完成: {collection_name}")
             return collection_name
             
         except Exception as e:
             logger.error(f"创建实体集合失败: {e}")
             raise
     
-    def create_sentence_collection(self, language: str) -> str:
+    def create_sentence_collection(self, language: str, vector_dim: int = None,
+                                 index_type: str = None, metric_type: str = None) -> str:
         """
         创建句子集合
         
         Args:
             language: 语种代码
+            vector_dim: 向量维度
+            index_type: 索引类型
+            metric_type: 相似度计算方式
             
         Returns:
             str: 集合名称
         """
         collection_name = f"{DATABASE_CONFIG['sentence_db_prefix']}{language}"
         
+        # 使用传入的参数或默认配置
+        dim = vector_dim or DATABASE_CONFIG["vector_dim"]
+        idx_type = index_type or DATABASE_CONFIG["index_type"]
+        metric = metric_type or DATABASE_CONFIG["metric_type"]
+        
+        logger.info(f"创建句子集合: {collection_name} (维度: {dim})")
+        
         # 检查集合是否已存在
         if utility.has_collection(collection_name):
-            logger.info(f"句子集合 {collection_name} 已存在")
-            return collection_name
+            logger.info(f"集合 {collection_name} 已存在，删除后重新创建")
+            utility.drop_collection(collection_name)
         
         try:
             # 定义字段
@@ -163,9 +197,9 @@ class MilvusClient:
                     auto_id=True
                 ),
                 FieldSchema(
-                    name="sentence_embedding",
-                    dtype=DataType.FLOAT_VECTOR,
-                    dim=DATABASE_CONFIG["vector_dim"]
+                    name="sentence_id",
+                    dtype=DataType.VARCHAR,
+                    max_length=100
                 ),
                 FieldSchema(
                     name="sentence_text",
@@ -176,13 +210,23 @@ class MilvusClient:
                     name="ner_labels",
                     dtype=DataType.VARCHAR,
                     max_length=5000
+                ),
+                FieldSchema(
+                    name="language",
+                    dtype=DataType.VARCHAR,
+                    max_length=10
+                ),
+                FieldSchema(
+                    name="embedding",
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=dim
                 )
             ]
             
             # 创建集合schema
             schema = CollectionSchema(
                 fields=fields,
-                description=f"句子向量数据库 - {language}"
+                description=f"句子集合 - {language}"
             )
             
             # 创建集合
@@ -194,17 +238,19 @@ class MilvusClient:
             
             # 创建索引
             index_params = {
-                "metric_type": DATABASE_CONFIG["metric_type"],
-                "index_type": DATABASE_CONFIG["index_type"],
-                "params": {"nlist": DATABASE_CONFIG["nlist"]}
+                "metric_type": metric,
+                "index_type": idx_type,
+                "params": {"nlist": DATABASE_CONFIG.get("nlist", 1024)}
             }
             
             collection.create_index(
-                field_name="sentence_embedding",
+                field_name="embedding",
                 index_params=index_params
             )
             
-            logger.info(f"成功创建句子集合: {collection_name}")
+            collection.load()
+            
+            logger.info(f"句子集合创建完成: {collection_name}")
             return collection_name
             
         except Exception as e:
